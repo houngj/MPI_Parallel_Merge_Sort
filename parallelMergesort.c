@@ -1,6 +1,5 @@
 #include <mpi.h>
 #include <stdio.h>
-
 #include <string.h>
 #include <unistd.h>
 #include <math.h>
@@ -26,23 +25,19 @@ int main(int argc, char** argv) {
     n = atoi(argv[1]);
     NodeNum = n;
     MPI_Bcast(&NodeNum, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    s = NodeNum/comm_sz;
-    
-    
-    
+    s = NodeNum/comm_sz;    
   }
   else {
     MPI_Bcast(&NodeNum, 1, MPI_INT, 0, MPI_COMM_WORLD);
     s = NodeNum/comm_sz;
-    
   }
   int local_buf[NodeNum];
+  memset(local_buf, -1, NodeNum);
+  
   for(i = 0; i < s; i++){
-    
     local_buf[i] = rand_r(&seed) % 100;
   }
   quickSort(local_buf, 0, s-1);
-  
   printf("rank %d received %d with random variables ", rank, NodeNum);
   
   for(i = 0; i < s; i++){
@@ -51,8 +46,11 @@ int main(int argc, char** argv) {
   printf("\n");
   //send sorted list to pair processor
   int recv_buf[NodeNum];
+  memset(recv_buf, -1, NodeNum);
   int merge_buf[NodeNum];
+  memset(merge_buf, -1, NodeNum);
   int divisor = 2;
+  int localcount = s;
   int core_difference = 1;
   int depthlimit = (int) ceil(log2(comm_sz));
   while(depthlimit != 0){
@@ -61,19 +59,31 @@ int main(int argc, char** argv) {
     if(rank%divisor == 0){
     	if(rank+core_difference < comm_sz){
 	  
-	  MPI_Recv(&recv_buf, s*core_difference, MPI_INT, rank+core_difference, 0, MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+	  MPI_Recv(&recv_buf, localcount, MPI_INT, rank+core_difference, 0, MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 	  Merge(local_buf, recv_buf, merge_buf, s*core_difference);
 	  printf("Merge for %d from %d : ", rank, rank+core_difference);
-	  for(i = 0; i < s*2*core_difference; i++){
+	  
+	  for(i = 0; i < s*core_difference*2 && i < NodeNum; i++){
+      
 	    local_buf[i] = merge_buf[i];
 	    printf("%d ", merge_buf[i]);
+	    
 	  }
 	  printf("\n");
 	}
+	for(i = 0; i < NodeNum; i++){
+      if(local_buf[i] == -1){
+	localcount = i;
+	break;
+      } else {
+	localcount = NodeNum;
+      }
+      
+    }
     }
     else if(rank%divisor == core_difference){
       
-      MPI_Send(&local_buf, s*core_difference, MPI_INT, rank-core_difference, 0, MPI_COMM_WORLD);
+      MPI_Send(&local_buf, localcount, MPI_INT, rank-core_difference, 0, MPI_COMM_WORLD);
       
     }
 
@@ -101,13 +111,15 @@ void Merge(int a[], int b[], int c[], int s){
   int smallest;
   int t = 0;
   while(1){
-    if(ac >= s){
+    if(ac >= s || a[ac] == -1){
       for(t = bc; t < s; t++)
 	c[cc++] = b[t];
+      
       break;
-    } else if(bc >= s){
-      for(t = ac; t < s; t++)
+    } else if(bc >= s || b[ac] == -1){
+      for(t = ac; t < s; t++)    
 	c[cc++] = a[t];
+      
       break;
     }
     if(a[ac] < b[bc]){

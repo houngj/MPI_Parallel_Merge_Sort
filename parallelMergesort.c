@@ -8,43 +8,58 @@
 void quickSort( int[], int, int);
 int partition( int[], int, int);
 void Merge(int[], int[], int[], int, int);
+void mergeSort(int[], int[], int);
+void m_sort(int[], int[], int, int);
+void merge1(int[], int[], int, int, int);
 
 int main(int argc, char** argv) {
   int rank;
   int NodeNum;
   int n;
   int comm_sz;
-  
+  double local_start, local_finish, local_elapsed, elapsed;
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
-  
+  int localcount;
   int s;
+  MPI_Barrier(MPI_COMM_WORLD);
   unsigned int seed = rank;
+  int z = 0;
   int i = 0;
-  if(rank == 0) {
-    n = atoi(argv[1]);
-    NodeNum = n;
-    MPI_Bcast(&NodeNum, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    s = NodeNum/comm_sz;    
-  }
-  else {
-    MPI_Bcast(&NodeNum, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    s = NodeNum/comm_sz;
-  }
-  int local_buf[NodeNum];
-  memset(local_buf, -1, NodeNum);
   
+  while(z != 50){
+    local_start = MPI_Wtime();
+    
+    //process 0 receives n and broadcasts to other processors
+    if(rank == 0) {
+      n = atoi(argv[1]);
+      NodeNum = n;
+      MPI_Bcast(&NodeNum, 1, MPI_INT, 0, MPI_COMM_WORLD);
+      s = NodeNum/comm_sz;    
+    }
+    else {
+      MPI_Bcast(&NodeNum, 1, MPI_INT, 0, MPI_COMM_WORLD);
+      s = NodeNum/comm_sz;
+    }
+    
+    //variable that keeps track of each processors buffer
+    
+  int local_buf[NodeNum];
+  int temp[NodeNum];
   for(i = 0; i < s; i++){
     local_buf[i] = rand_r(&seed) % 100;
   }
-  quickSort(local_buf, 0, s-1);
+  
+  mergeSort(local_buf, temp, s-1); 
+  
+  
   int From;
   int To;
   int recv_buf[NodeNum];
   int merge_buf[NodeNum];
   int divisor = 2;
-  int localcount = s;
+  localcount = s;
   int core_difference = 1;
   int localcount2 = s;
   int recvcount;
@@ -77,12 +92,13 @@ int main(int argc, char** argv) {
     divisor *=2;
     core_difference *= 2;
   } 
-  
+  local_finish = MPI_Wtime();
+  z++;
+  }
+  local_elapsed = local_elapsed+(local_finish - local_start);
+  MPI_Reduce(&local_elapsed, &elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
   if(rank == 0){
-    printf("FIN------rank 0 ends with: ");
-    for(i = 0; i < localcount; i++)
-      printf("%d ", local_buf[i]);
-    printf("\n");
+    printf("Time: %f\n", elapsed);
   }
   MPI_Finalize();
   return 0;
@@ -123,32 +139,67 @@ void Merge(int a[], int b[], int c[], int localcount, int recvcount){
 }
 
 
-void quickSort( int a[], int l, int r)
+
+void mergeSort(int numbers[], int temp[], int array_size)
 {
-  int j;
-
-  if( l < r ) 
-    {
-      // divide and conquer
-      j = partition( a, l, r);
-      quickSort( a, l, j-1);
-      quickSort( a, j+1, r);
-    }
-  
+  m_sort(numbers, temp, 0, array_size - 1);
 }
-
-int partition( int a[], int l, int r) {
-  int pivot, i, j, t;
-  pivot = a[l];
-  i = l; j = r+1;
-  
-  while( 1)
+ 
+ 
+void m_sort(int numbers[], int temp[], int left, int right)
+{
+  int mid;
+ 
+  if (right > left)
     {
-      do ++i; while( a[i] <= pivot && i <= r );
-      do --j; while( a[j] > pivot );
-      if( i >= j ) break;
-      t = a[i]; a[i] = a[j]; a[j] = t;
+      mid = (right + left) / 2;
+      m_sort(numbers, temp, left, mid);
+      m_sort(numbers, temp, mid+1, right);
+ 
+      merge1(numbers, temp, left, mid+1, right);
     }
-  t = a[l]; a[l] = a[j]; a[j] = t;
-  return j;
+}
+ 
+void merge1(int numbers[], int temp[], int left, int mid, int right)
+{
+  int i, left_end, num_elements, tmp_pos;
+ 
+  left_end = mid - 1;
+  tmp_pos = left;
+  num_elements = right - left + 1;
+ 
+  while ((left <= left_end) && (mid <= right))
+    {
+      if (numbers[left] <= numbers[mid])
+	{
+	  temp[tmp_pos] = numbers[left];
+	  tmp_pos = tmp_pos + 1;
+	  left = left +1;
+	}
+      else
+	{
+	  temp[tmp_pos] = numbers[mid];
+	  tmp_pos = tmp_pos + 1;
+	  mid = mid + 1;
+	}
+    }
+ 
+  while (left <= left_end)
+    {
+      temp[tmp_pos] = numbers[left];
+      left = left + 1;
+      tmp_pos = tmp_pos + 1;
+    }
+  while (mid <= right)
+    {
+      temp[tmp_pos] = numbers[mid];
+      mid = mid + 1;
+      tmp_pos = tmp_pos + 1;
+    }
+ 
+  for (i=0; i <= num_elements; i++)
+    {
+      numbers[right] = temp[right];
+      right = right - 1;
+    }
 }

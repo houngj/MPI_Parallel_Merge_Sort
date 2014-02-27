@@ -39,17 +39,10 @@ int main(int argc, char** argv) {
     local_buf[i] = rand_r(&seed) % 100;
   }
   quickSort(local_buf, 0, s-1);
-  //printf("rank %d received %d with random variables ", rank, NodeNum);
-  
-  //for(i = 0; i < s; i++){
-  //  printf("%d ", local_buf[i]);
-  //}
-  //printf("\n");
-  //send sorted list to pair processor
+  int From;
+  int To;
   int recv_buf[NodeNum];
-  memset(recv_buf, -1, NodeNum);
   int merge_buf[NodeNum];
-  memset(merge_buf, -1, NodeNum);
   int divisor = 2;
   int localcount = s;
   int core_difference = 1;
@@ -57,28 +50,21 @@ int main(int argc, char** argv) {
   int recvcount;
   int depthlimit = (int) ceil(log2(comm_sz));
   while(depthlimit != 0){
-    int From = rank+core_difference;
-    int To = rank-core_difference;
+    From = rank+core_difference;
+    To = rank-core_difference;
     if(rank%divisor == 0){
     	if(rank+core_difference < comm_sz){  
 	  //Recv from rank+core_difference
 	  MPI_Recv(&recvcount, 1, MPI_INT, From, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	  MPI_Recv(&recv_buf, recvcount, MPI_INT, From, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-	  printf("%d has ", rank);
-	  for(i = 0; i < localcount; i++)
-	    printf("%d ", local_buf[i]);
-	  printf("and recieved: "); 
-	  for(i = 0; i < recvcount; i++){
-	    printf("%d ", recv_buf[i]);
-	    local_buf[i] = recv_buf[i];
-	  }
-	  printf("from %d\n", From);
-	  for(i = recvcount; i < (localcount+recvcount); i++)
-	    local_buf[i] = local_buf[i-recvcount];
-	  localcount = localcount+recvcount;
-	  //reassign local_buf
 	  
-	    
+	  //merge
+	  Merge(local_buf, recv_buf, merge_buf, localcount, recvcount);
+	  for(i = 0; i < (localcount+recvcount); i++){
+	    local_buf[i] = merge_buf[i];
+	  }
+	  localcount = localcount+recvcount;
+	  //reassign local_buf 
 	}	
     }
     else if(rank%divisor == core_difference){
@@ -90,10 +76,10 @@ int main(int argc, char** argv) {
     depthlimit--;
     divisor *=2;
     core_difference *= 2;
-  }
+  } 
   
   if(rank == 0){
-    printf("rank 0 ends with: ");
+    printf("FIN------rank 0 ends with: ");
     for(i = 0; i < localcount; i++)
       printf("%d ", local_buf[i]);
     printf("\n");
@@ -104,25 +90,20 @@ int main(int argc, char** argv) {
 
 
 
-void Merge(int a[], int b[], int c[], int s, int localcount){
+void Merge(int a[], int b[], int c[], int localcount, int recvcount){
   int ac = 0;
   int bc = 0;
   int cc = 0;
-  //a: 35 58 67 
-  //b: 7 8 13 79 82 84 
-  //s: 6 
-  //localcount: 3
-  printf("s: %d localcount: %d\n", s, localcount);
   int smallest;
   int t = 0;
   while(1){
-    if(ac == s || a[ac] == -1){
-      for(t = bc; t < localcount; t++)
+    if(ac == localcount){
+      for(t = bc; t < recvcount; t++)
 	c[cc++] = b[t];
       
       break;
-    } else if(bc == localcount || b[ac] == -1){
-      for(t = ac; t < s; t++)    
+    } else if(bc == recvcount){
+      for(t = ac; t < localcount; t++)    
 	c[cc++] = a[t];
       
       break;
@@ -136,7 +117,7 @@ void Merge(int a[], int b[], int c[], int s, int localcount){
     }
     
     c[cc++] = smallest;
-    if(cc >= (s+localcount))
+    if(cc == (recvcount+localcount))
       break;
   }
 }

@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <math.h>
 #include <time.h>
-
+#include <stdlib.h>
 void quickSort( int[], int, int);
 int partition( int[], int, int);
 void Merge(int[], int[], int[], int, int);
@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
   unsigned int seed = rank;
   int z = 0;
   int i = 0;
-  
+  int local_buf[atoi(argv[1])];
   while(z != 50){
     local_start = MPI_Wtime();
     
@@ -45,34 +45,50 @@ int main(int argc, char** argv) {
     
     //variable that keeps track of each processors buffer
     
-  int local_buf[NodeNum];
-  int temp[NodeNum];
-  for(i = 0; i < s; i++){
-    local_buf[i] = rand_r(&seed) % 100;
-  }
-  
-  mergeSort(local_buf, temp, s-1); 
-  
-  
-  int From;
-  int To;
-  int recv_buf[NodeNum];
-  int merge_buf[NodeNum];
-  int divisor = 2;
-  localcount = s;
-  int core_difference = 1;
-  int localcount2 = s;
-  int recvcount;
-  int depthlimit = (int) ceil(log2(comm_sz));
-  while(depthlimit != 0){
-    From = rank+core_difference;
-    To = rank-core_difference;
-    if(rank%divisor == 0){
+    
+    int temp[NodeNum];
+    
+    if(z == 49)
+      printf("Rank %d has random numbers: ", rank);
+    for(i = 0; i < s; i++){
+      local_buf[i] = rand_r(&seed) % 100;
+      if(z == 49)
+	printf("%d ", local_buf[i]);
+    }
+    if(z == 49)
+      printf("\n");
+    mergeSort(local_buf, temp, s-1); 
+    
+    
+    int From;
+    int To;
+    int recv_buf[NodeNum];
+    int merge_buf[NodeNum];
+    int divisor = 2;
+    localcount = s;
+    int core_difference = 1;
+    
+    int recvcount;
+    int depthlimit = (int) ceil(log2(comm_sz));
+    while(depthlimit != 0){
+      
+      From = rank+core_difference;
+      To = rank-core_difference;
+      if(rank%divisor == 0){
     	if(rank+core_difference < comm_sz){  
 	  //Recv from rank+core_difference
 	  MPI_Recv(&recvcount, 1, MPI_INT, From, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	  MPI_Recv(&recv_buf, recvcount, MPI_INT, From, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-	  
+
+	  if(z == 49){
+	    printf("Rank %d's local buffer is: ", rank);
+	    for(i = 0; i < localcount; i++)
+	      printf("%d ", local_buf[i]);
+	    printf("; Recieves: ");
+	    for(i = 0; i < recvcount; i++)
+	      printf("%d ", recv_buf[i]);
+	    printf("from Rank %d\n", From);
+	  }
 	  //merge
 	  Merge(local_buf, recv_buf, merge_buf, localcount, recvcount);
 	  for(i = 0; i < (localcount+recvcount); i++){
@@ -81,25 +97,32 @@ int main(int argc, char** argv) {
 	  localcount = localcount+recvcount;
 	  //reassign local_buf 
 	}	
-    }
-    else if(rank%divisor == core_difference){
+      }
+      else if(rank%divisor == core_difference){
       //Send to rank-coredifference
-      MPI_Send(&localcount, 1, MPI_INT, To, 0, MPI_COMM_WORLD);
-      MPI_Send(&local_buf, localcount, MPI_INT, To, 0, MPI_COMM_WORLD);
-    }
-    //MPI_Barrier(MPI_COMM_WORLD);
-    depthlimit--;
-    divisor *=2;
-    core_difference *= 2;
-  } 
-  local_finish = MPI_Wtime();
-  z++;
+	MPI_Send(&localcount, 1, MPI_INT, To, 0, MPI_COMM_WORLD);
+	MPI_Send(&local_buf, localcount, MPI_INT, To, 0, MPI_COMM_WORLD);
+      }
+      
+      depthlimit--;
+      divisor *=2;
+      core_difference *= 2;
+    } 
+    local_finish = MPI_Wtime();
+    z++;
   }
   local_elapsed = local_elapsed+(local_finish - local_start);
   MPI_Reduce(&local_elapsed, &elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  
   if(rank == 0){
-    printf("Time: %f\n", elapsed);
+    printf("Rank 0 ends up with: ");
+    for(i = 0; i < NodeNum; i++)
+      printf("%d ", local_buf[i]);
+    printf("\nTime: %f\n", elapsed);  
+
   }
+  
+  
   MPI_Finalize();
   return 0;
 }

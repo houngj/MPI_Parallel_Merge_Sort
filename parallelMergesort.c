@@ -48,15 +48,15 @@ int main(int argc, char** argv) {
     
     int temp[NodeNum];
     
-    if(z == 49)
-      printf("Rank %d has random numbers: ", rank);
-    for(i = 0; i < s; i++){
+    //if(z == 49)
+    //  printf("Rank %d has random numbers: ", rank);
+    for(i = 0; i < s; i++)
       local_buf[i] = rand_r(&seed) % 100;
-      if(z == 49)
-	printf("%d ", local_buf[i]);
-    }
-    if(z == 49)
-      printf("\n");
+    //  if(z == 49)
+    //	printf("%d ", local_buf[i]);
+    //}
+    //if(z == 49)
+    //  printf("\n");
     mergeSort(local_buf, temp, s-1); 
     
     
@@ -80,15 +80,15 @@ int main(int argc, char** argv) {
 	  MPI_Recv(&recvcount, 1, MPI_INT, From, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	  MPI_Recv(&recv_buf, recvcount, MPI_INT, From, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-	  if(z == 49){
-	    printf("Rank %d's local buffer is: ", rank);
-	    for(i = 0; i < localcount; i++)
-	      printf("%d ", local_buf[i]);
-	    printf("; Recieves: ");
-	    for(i = 0; i < recvcount; i++)
-	      printf("%d ", recv_buf[i]);
-	    printf("from Rank %d\n", From);
-	  }
+	  //	  if(z == 49){
+	  //  printf("Rank %d's local buffer is: ", rank);
+	  // for(i = 0; i < localcount; i++)
+	  //  printf("%d ", local_buf[i]);
+	  //printf("; Recieves: ");
+	  //for(i = 0; i < recvcount; i++)
+	  //  printf("%d ", recv_buf[i]);
+	  //printf("from Rank %d\n", From);
+	  //}
 	  //merge
 	  Merge(local_buf, recv_buf, merge_buf, localcount, recvcount);
 	  for(i = 0; i < (localcount+recvcount); i++){

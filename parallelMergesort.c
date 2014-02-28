@@ -52,6 +52,26 @@ int main(int argc, char** argv) {
     //  printf("Rank %d has random numbers: ", rank);
     for(i = 0; i < s; i++)
       local_buf[i] = rand_r(&seed) % 100;
+    int d = 0;
+    if(z == 49){
+      if(rank == 0){
+	int buffer[s];
+	printf("Processor 0 has ");
+	for(i = 0; i < s; i++)
+	  printf("%d ", local_buf[i]);
+	printf("\n");
+	for(i = 1; i < comm_sz; i++){
+	  printf("Processor %d has ", i); 
+	  MPI_Recv(&buffer, s, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	  for(d = 0; d < s; d++)
+	    printf("%d ", buffer[d]);
+	  printf("\n");
+	}
+      }
+      else{
+	MPI_Send(&local_buf, s, MPI_INT, 0, 0, MPI_COMM_WORLD);
+      }
+    }
     //  if(z == 49)
     //	printf("%d ", local_buf[i]);
     //}
